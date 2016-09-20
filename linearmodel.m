@@ -1,3 +1,5 @@
+import casadi.*
+
 N = 100;
 
 % parameters
@@ -22,7 +24,7 @@ ode = @(x,u) [x(2)-u(2);
               cs/ms*x(2)-ks/ms*x(3)-cs/ms*x(4)-1/ms*u(1)];
 
 % states
-x = optivar(N+1,4,'x');
+X = optivar(N+1,4,'x');
 
 % control: 
 U = optivar(N,1,'U');
@@ -45,33 +47,42 @@ z0_punt = @(t) 0.*t.*(t<0.25)+0.05*(8*pi*sin(8*pi.*t))/2.*(t>=0.25 & t<0.5)+0.*t
 % z0     = @(t) 0.*t.*(t<0.25)+0.05*(1-cos(8*pi.*t))/2.*(t>=0.25 & t<0.5)+0.*t.*(t>=0.5 & t<0.75)-0.05*(1-cos(8*pi.*t))/2.*(t>=0.75 & t<1);
 % z0_punt = @(t) 0.*t.*(t<0.25)+0.05*(8*pi*sin(8*pi.*t))/2.*(t>=0.25 & t<0.5)+0.*t.*(t>=0.5 & t<0.75)-0.05*(8*pi*sin(8*pi.*t))/2.*(t>=0.75 & t<1);
 
+
+% Create CasADi function, for speed of initialization
+
+x = SX.sym('x',4);
+u = SX.sym('u',2);
+simulate_one_interval = Function('rk4', {x,u},{rk4(ode,tf/N,x,u)});
+
+y = ode(x,u);
+cost = Function('cost',{x,u},{(y(4,1)^2+1100*x(1,1)^2+100*x(3,1)^2)*tf/N});
+
 % Construct list of all constraints
 g = {};
 
 f = 0;
 for k=1:N
-   xk      = x(k,:)';
-   xk_plus = x(k+1,:)';
+   xk      = X(k,:)';
+   xk_plus = X(k+1,:)';
    
    % shooting constraint
    uk = [U(k);z0_punt(k*tf/N)];
    
-   xf = rk4(ode,tf/N,xk,uk);
+   xf = simulate_one_interval(xk,uk);
    g = {g{:}, xk_plus==xf};
 
-   y=ode(xk,uk);
-   f = f + (y(4,1)^2+1100*xk(1,1)^2+100*xk(3,1)^2)*tf/N;
+   f = f + cost(xk,uk);
 end
 
 % path constraint
 % constr = @(x2) 1-sin(2*pi*x2)/2;
 
-g = {g{:}, x(:,3) <= 1, x(:,3) >= -1 };  %constr(x2)
+g = {g{:}, X(:,3) <= 1, X(:,3) >= -1 };  %constr(x2)
 
 U.setLb(-3000);
 U.setUb(3000);
 
-g = {g{:}, x(1,:)==0, x(end,:)==0};
+g = {g{:}, X(1,:)==0, X(end,:)==0};
 
 disp('solving problem')
 optisolve(f,g,struct('expand',true));
@@ -88,16 +99,16 @@ optisolve(f,g,struct('expand',true));
 figure
 subplot(3,1,1)
 hold on
-plot(optival(x(:,2)),'m');
-plot(optival(x(:,4)),'r');
+plot(optival(X(:,2)),'m');
+plot(optival(X(:,4)),'r');
 plot(d,z0_punt(d*tf/N),'k');
 legend('unsprung-mass velocity [m/s]','sprung-mass velocity [m/s]','road velocity disturbance [m/s]');
 axis([0 N -inf inf]);
 
 subplot(3,1,2)
 hold on
-plot(optival(x(:,1)),'y');
-plot(optival(x(:,3)),'c');
+plot(optival(X(:,1)),'y');
+plot(optival(X(:,3)),'c');
 plot(d,z0(d*tf/N),'k');
 %plot(0.05*ones(size(optival(x(:,1))))+optival(x(:,1))+optival(x(:,3))+z0(d*tf/N)')
 legend('tire deflection [m]','suspension stroke [m]','road disturbance [m]');
