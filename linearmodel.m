@@ -7,6 +7,7 @@ ks = 15791;     % spring coefficient suspension system
 kus = 157910;   % compressibility pneumatic tire
 cs = 1508;      % damping coefficient suspension system
 cus = 400;      % damping pneumatic tire (41% of cs)
+Ns = 1600;      % nonlinear stiffness property of primary suspension
 
 % u(1) = active control force suspension
 % u(2) = derivative of road displacement input -> road velocity disturbance
@@ -17,9 +18,9 @@ cus = 400;      % damping pneumatic tire (41% of cs)
 
 % ode
 ode = @(x,u) [x(2)-u(2);
-              -kus/mus*x(1)-(cs+cus)/mus*x(2)+ks/mus*x(3)+cs/mus*x(4)+1/mus*u(1)+cus/mus*u(2);
+              -kus/mus*x(1)-(cs+cus)/mus*x(2)+ks/mus*x(3)+cs/mus*x(4)+1/mus*u(1)+cus/mus*u(2)-Ns/mus*(x(3))^3;
               -x(2)+x(4);
-              cs/ms*x(2)-ks/ms*x(3)-cs/ms*x(4)-1/ms*u(1)];
+              cs/ms*x(2)-ks/ms*x(3)-cs/ms*x(4)-1/ms*u(1)-Ns/mus*(x(3))^3];
 
 % states
 x = optivar(N+1,4,'x');
