@@ -67,9 +67,11 @@ simulate_one_interval = Function('rk4', {x,u},{rk4(ode,tf/N,x,u)});
 
 y = ode(x,u);
 cost = Function('cost',{x,u},{(y(4,1)^2+1100*x(1,1)^2+100*x(3,1)^2)*tf/N});
+output = Function('output',{x,u},{[y(4,1);x(1,1);x(3,1)]});
 
 % Construct list of all constraints
 g = {};
+outputs = {};
 
 f = 0;
 for k=1:N
@@ -81,9 +83,12 @@ for k=1:N
    
    xf = simulate_one_interval(xk,uk);
    g = {g{:}, xk_plus==xf};
+   outputs = {outputs{:} output(xk,uk)};
 
    f = f + cost(xk,uk);
 end
+
+outputs_all = [outputs{:}];
 
 % path constraint
 % constr = @(x2) 1-sin(2*pi*x2)/2;
@@ -97,6 +102,8 @@ g = {g{:}, X(1,:)==0};
 
 disp('solving problem')
 optisolve(f,g,struct('expand',true));
+
+optival(outputs_all)
 
 % X0.setValue([0;0;0;0])
 % sol = optisolve(f,g,struct('expand',true));
